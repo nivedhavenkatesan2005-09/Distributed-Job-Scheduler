@@ -1,0 +1,128 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id        String    @id @default(uuid())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  users     User[]
+  projects  Project[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  passwordHash   String
+  role           String       @default("MEMBER") // ADMIN, MEMBER
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id             String       @id @default(uuid())
+  name           String
+  description    String?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  queues         Queue[]
+}
+
+model Queue {
+  id             String   @id @default(uuid())
+  name           String
+  projectId      String
+  priority       Int      @default(5)
+  concurrency    Int      @default(10)
+  rateLimitPerMin Int?    // Null means unlimited
+  isPaused       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobs           Job[]
+}
+
+model Job {
+  id             String    @id @default(uuid())
+  queueId        String
+  name           String
+  payload        String    // JSON string payload
+  state          String    @default("QUEUED") // QUEUED, SCHEDULED, CLAIMED, RUNNING, COMPLETED, FAILED, DEAD_LETTERED
+  
+  // Scheduling
+  runAt          DateTime  @default(now())
+  cronExpression String?   // For recurring jobs
+  
+  // Retries
+  maxRetries     Int       @default(3)
+  retryCount     Int       @default(0)
+  retryStrategy  String    @default("EXPONENTIAL") // FIXED, LINEAR, EXPONENTIAL
+  retryDelayMs   Int       @default(1000)
+  
+  // Concurrency & Locks
+  lockedAt       DateTime?
+  lockedBy       String?   // Worker ID
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  queue          Queue     @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  executions     JobExecution[]
+  deadLetter     DeadLetterQueue?
+  
+  @@index([state, runAt])
+  @@index([queueId, state])
+}
+
+model JobExecution {
+  id           String    @id @default(uuid())
+  jobId        String
+  workerId     String
+  status       String    // SUCCESS, FAILED
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  logs         String?
+  errorDetails String?
+
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Worker {
+  id               String    @id @default(uuid())
+  name             String
+  hostname         String
+  ipAddress        String
+  status           String    @default("HEALTHY") // HEALTHY, BUSY, PAUSED, SHUTDOWN, STALLED
+  concurrencyLimit Int       @default(10)
+  activeJobsCount  Int       @default(0)
+  lastHeartbeatAt  DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  // Hardware metrics
+  cpuUsagePct      Float     @default(0)
+  memoryUsageMb    Int       @default(0)
+}
+
+model DeadLetterQueue {
+  id             String    @id @default(uuid())
+  jobId          String    @unique
+  reason         String
+  failedAt       DateTime  @default(now())
+  aiSummary      String?   // Bonus requirement
+
+  job            Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
