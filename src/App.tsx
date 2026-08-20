@@ -46,7 +46,11 @@ const DEFAULT_ALERT_CONFIG: AlertThresholdConfig = {
   soundEnabled: false
 };
 
+import { LoginScreen } from './components/LoginScreen';
+
 export function App() {
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('hyperplane_token'));
+  const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
@@ -57,6 +61,28 @@ export function App() {
     } catch {}
     return 'cyber'; // Default to Cyber Cyan dark theme
   });
+
+  useEffect(() => {
+    if (authToken) {
+      const originalFetch = window.fetch;
+      window.fetch = async (input, init) => {
+        init = init || {};
+        init.headers = {
+          ...init.headers,
+          Authorization: `Bearer ${authToken}`
+        };
+        const res = await originalFetch(input, init);
+        if (res.status === 401) {
+          localStorage.removeItem('hyperplane_token');
+          setAuthToken(null);
+        }
+        return res;
+      };
+      return () => {
+        window.fetch = originalFetch;
+      };
+    }
+  }, [authToken]);
 
   useEffect(() => {
     try {
@@ -619,6 +645,14 @@ export function App() {
       showToast(`Traffic simulation failed: ${err?.message}`);
     }
   };
+
+  if (!authToken) {
+    return <LoginScreen onLogin={(token, user) => {
+      localStorage.setItem('hyperplane_token', token);
+      setAuthToken(token);
+      setUser(user);
+    }} />;
+  }
 
   return (
     <div className={`min-h-screen font-sans pb-16 theme-${theme}`}>

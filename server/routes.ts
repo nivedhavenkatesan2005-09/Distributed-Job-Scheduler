@@ -12,6 +12,22 @@ import { diagnoseJobFailure } from './gemini';
 import { Job, Queue, Project, Workflow, TestSuiteResult } from '../src/types';
 
 export const router = Router();
+import { authenticate, generateToken } from '../src/backend/auth';
+
+router.post('/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  const user = Array.from(db.users.values()).find(u => u.email === email);
+  if (!user || password !== 'intern2026') {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+  const token = generateToken(user.id, user.role, user.organizationId);
+  res.json({ token, user });
+});
+
+router.use((req, res, next) => {
+  if (req.path === '/events' || req.path === '/auth/login') return next();
+  authenticate(req, res, next);
+});
 
 // Store active SSE clients
 const sseClients = new Set<Response>();
