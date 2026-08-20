@@ -73,8 +73,9 @@ db.emitEvent = (event) => {
 // 2. Authentication & Projects
 // ----------------------------------------------------------------------------
 router.get('/auth/me', (req: Request, res: Response) => {
-  const userId = (req.query.userId as string) || 'usr-admin';
-  const user = db.users.get(userId) || Array.from(db.users.values())[0];
+  const userReq = (req as any).user;
+  const userId = userReq?.userId || (req.query.userId as string);
+  const user = (userId && db.users.get(userId)) || Array.from(db.users.values())[0];
   res.json({ user, users: Array.from(db.users.values()) });
 });
 

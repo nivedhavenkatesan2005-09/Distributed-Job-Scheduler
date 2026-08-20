@@ -46,11 +46,36 @@ const DEFAULT_ALERT_CONFIG: AlertThresholdConfig = {
   soundEnabled: false
 };
 
+const DEFAULT_USER: User = {
+  id: 'usr-admin',
+  name: 'Alex Rivera',
+  email: 'alex.rivera@hyperplane.io',
+  role: 'admin',
+  organizationId: 'org-main',
+  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+};
+
 import { LoginScreen } from './components/LoginScreen';
 
 export function App() {
-  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('hyperplane_token'));
-  const [user, setUser] = useState<User | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('hyperplane_token');
+    } catch {
+      return null;
+    }
+  });
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const savedUser = localStorage.getItem('hyperplane_user');
+      if (savedUser) return JSON.parse(savedUser);
+      const token = localStorage.getItem('hyperplane_token');
+      if (token) return DEFAULT_USER;
+      return null;
+    } catch {
+      return null;
+    }
+  });
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
@@ -61,28 +86,6 @@ export function App() {
     } catch {}
     return 'cyber'; // Default to Cyber Cyan dark theme
   });
-
-  useEffect(() => {
-    if (authToken) {
-      const originalFetch = window.fetch;
-      window.fetch = async (input, init) => {
-        init = init || {};
-        init.headers = {
-          ...init.headers,
-          Authorization: `Bearer ${authToken}`
-        };
-        const res = await originalFetch(input, init);
-        if (res.status === 401) {
-          localStorage.removeItem('hyperplane_token');
-          setAuthToken(null);
-        }
-        return res;
-      };
-      return () => {
-        window.fetch = originalFetch;
-      };
-    }
-  }, [authToken]);
 
   useEffect(() => {
     try {
@@ -101,7 +104,6 @@ export function App() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('proj-prod');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [queues, setQueues] = useState<Queue[]>([]);
@@ -320,8 +322,53 @@ export function App() {
     setIsAlertModalOpen(false);
   };
 
+  const handleLogin = useCallback((token: string, loggedUser: User) => {
+    try {
+      localStorage.setItem('hyperplane_token', token);
+      localStorage.setItem('hyperplane_user', JSON.stringify(loggedUser));
+    } catch {}
+    setAuthToken(token);
+    setCurrentUser(loggedUser);
+    showToast(`Welcome back, ${loggedUser.name}`);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    try {
+      localStorage.removeItem('hyperplane_token');
+      localStorage.removeItem('hyperplane_user');
+    } catch {}
+    setAuthToken(null);
+    setCurrentUser(null);
+    showToast('Signed out of cluster');
+  }, []);
+
+  // Helper safe fetch for JSON endpoints
+  const safeFetchJson = async (url: string, init?: RequestInit) => {
+    try {
+      const headers = {
+        ...(init?.headers || {}),
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      };
+      const res = await fetch(url, { ...init, headers });
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        if (res.status === 401) {
+          handleLogout();
+        }
+        return null;
+      }
+      if (contentType.includes('application/json')) {
+        return await res.json();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   // 1. Initial State Fetch
   const fetchData = useCallback(async () => {
+    if (!authToken) return;
     try {
       const [
         authRes,
@@ -333,17 +380,17 @@ export function App() {
         wfRes,
         metricsRes
       ] = await Promise.all([
-        fetch('/api/auth/me').then(r => r.json()),
-        fetch('/api/projects').then(r => r.json()),
-        fetch(`/api/queues?projectId=${selectedProjectId}`).then(r => r.json()),
-        fetch('/api/jobs?limit=100').then(r => r.json()),
-        fetch('/api/workers').then(r => r.json()),
-        fetch('/api/dlq').then(r => r.json()),
-        fetch('/api/workflows').then(r => r.json()),
-        fetch('/api/metrics').then(r => r.json())
+        safeFetchJson('/api/auth/me'),
+        safeFetchJson('/api/projects'),
+        safeFetchJson(`/api/queues?projectId=${selectedProjectId}`),
+        safeFetchJson('/api/jobs?limit=100'),
+        safeFetchJson('/api/workers'),
+        safeFetchJson('/api/dlq'),
+        safeFetchJson('/api/workflows'),
+        safeFetchJson('/api/metrics')
       ]);
 
-      if (authRes.user) setCurrentUser(authRes.user);
+      if (authRes?.user) setCurrentUser(authRes.user);
       if (Array.isArray(projRes)) setProjects(projRes);
       if (Array.isArray(queueRes)) setQueues(queueRes);
       if (jobsRes?.jobs) setJobs(jobsRes.jobs);
@@ -352,16 +399,20 @@ export function App() {
       if (Array.isArray(wfRes)) setWorkflows(wfRes);
       if (metricsRes) setMetrics(metricsRes);
     } catch (err) {
-      console.error('[Client] Initial data fetch error:', err);
+      console.warn('[Client] Initial data fetch warning:', err);
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, authToken]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (authToken) {
+      fetchData();
+    }
+  }, [fetchData, authToken]);
 
   // 2. Real-Time SSE Stream with Polling Fallback
   useEffect(() => {
+    if (!authToken) return;
+
     let eventSource: EventSource | null = null;
     let fallbackInterval: NodeJS.Timeout | null = null;
 
@@ -401,7 +452,7 @@ export function App() {
       if (eventSource) eventSource.close();
       if (fallbackInterval) clearInterval(fallbackInterval);
     };
-  }, [fetchData]);
+  }, [fetchData, authToken]);
 
   // 3. User Role Switcher
   const setCurrentUserRole = (role: Role) => {
@@ -646,12 +697,8 @@ export function App() {
     }
   };
 
-  if (!authToken) {
-    return <LoginScreen onLogin={(token, user) => {
-      localStorage.setItem('hyperplane_token', token);
-      setAuthToken(token);
-      setUser(user);
-    }} />;
+  if (!authToken || !currentUser) {
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (
@@ -673,6 +720,7 @@ export function App() {
         onOpenAlertSettings={() => setIsAlertModalOpen(true)}
         currentTheme={theme}
         onSelectTheme={setTheme}
+        onLogout={handleLogout}
       />
 
       {/* Main Container */}

@@ -21,7 +21,9 @@ import {
   ChevronDown,
   Sparkles,
   Search,
-  Filter
+  Filter,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 import { Project, Role, User, ThemeMode } from '../types';
 import { ThemeSelector } from './ThemeSelector';
@@ -41,6 +43,7 @@ interface NavbarProps {
   onOpenAlertSettings?: () => void;
   currentTheme?: ThemeMode;
   onSelectTheme?: (theme: ThemeMode) => void;
+  onLogout?: () => void;
 }
 
 export type NavCategory = 'all' | 'operations' | 'automation' | 'observability' | 'docs';
@@ -59,7 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeAlertCount = 0,
   onOpenAlertSettings,
   currentTheme = 'light',
-  onSelectTheme = () => {}
+  onSelectTheme = () => {},
+  onLogout
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<NavCategory>('all');
   const [isTrafficDropdownOpen, setIsTrafficDropdownOpen] = useState(false);
@@ -312,6 +316,35 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <option value="developer" className="bg-stone-900 text-stone-200">DEVELOPER</option>
                 <option value="viewer" className="bg-stone-900 text-stone-200">VIEWER</option>
               </select>
+            </div>
+
+            {/* User Account & Logout */}
+            <div className="flex items-center space-x-2 pl-1 border-l border-stone-800">
+              <div className="hidden lg:flex items-center space-x-2 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md">
+                <div className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-[10px] font-bold text-cyan-300">
+                  {currentUser?.name?.charAt(0) || 'A'}
+                </div>
+                <div className="text-left">
+                  <div className="text-[11px] font-medium text-stone-200 leading-tight truncate max-w-[100px]">
+                    {currentUser?.name || 'Alex Rivera'}
+                  </div>
+                  <div className="text-[9px] text-stone-400 font-mono leading-none">
+                    {currentUser?.email || 'alex@hyperplane.io'}
+                  </div>
+                </div>
+              </div>
+
+              {onLogout && (
+                <button
+                  id="btn-logout"
+                  onClick={onLogout}
+                  title="Logout / Switch Account"
+                  className="flex items-center space-x-1 px-2 py-1 text-[11px] font-medium text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-md transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              )}
             </div>
 
             {/* Theme Selector */}
