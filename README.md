@@ -2,7 +2,7 @@
 
 A production-inspired distributed job scheduling platform capable of reliably executing asynchronous background jobs across multiple workers. Built with a decoupled architecture to evaluate backend engineering, concurrency, and full-stack implementation.
 
-🌐 **Live Demo:** [View Dashboard](https://job-scheduler-demo.onrender.com) *(Replace with your actual Render URL!)*
+🌐 **Live Demo:** https://job-scheduler-demo.onrender.com
 
 ## 📚 Project Deliverables (Documentation)
 All requested documentation and diagrams can be found in the `docs/` directory:
