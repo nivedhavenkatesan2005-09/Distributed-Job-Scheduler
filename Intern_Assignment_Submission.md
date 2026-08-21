@@ -7,25 +7,25 @@ The Distributed Job Scheduler is designed as a decoupled, asynchronous backgroun
 
 ```mermaid
 graph TD
-    subgraph Client Layer
+    subgraph Client_Layer ["Client Layer"]
         UI[React Dashboard]
         API_CLI[REST Clients]
     end
 
-    subgraph API Layer (Node.js/Express)
+    subgraph API_Layer ["API Layer (Node.js/Express)"]
         Router[API Router]
         Auth[JWT Middleware]
         Ingestion[Job Ingestion Engine]
         SSE[SSE Streamer]
     end
 
-    subgraph Core Engine (Scheduler & Workers)
+    subgraph Core_Engine ["Core Engine (Scheduler & Workers)"]
         Ticker[Scheduler Ticker]
         Pool[Worker Fleet Engine]
         DLQ_Mgr[DLQ Manager]
     end
 
-    subgraph Database Layer
+    subgraph Database_Layer ["Database Layer"]
         DB[(Primary Database)]
         Cache[(Idempotency Cache)]
     end
