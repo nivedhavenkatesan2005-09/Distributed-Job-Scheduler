@@ -9,10 +9,15 @@ import { db } from './db';
 import { scheduler } from './scheduler';
 import { workerPool } from './worker-pool';
 import { diagnoseJobFailure } from './gemini';
-import { Job, Queue, Project, Workflow, TestSuiteResult } from '../src/types';
+import { lockManager } from './distributed-lock';
+import { shardingEngine } from './sharding';
+import { eventBus } from './event-bus';
+import { rateLimiter } from './rate-limiter';
+import { realtimeHub } from './realtime';
+import { authenticate, generateToken, requirePermission, requireRole, ROLE_PERMISSIONS, hasPermission } from '../src/backend/auth';
+import { Job, Queue, Project, Workflow, TestSuiteResult, Role, Permission } from '../src/types';
 
 export const router = Router();
-import { authenticate, generateToken } from '../src/backend/auth';
 
 router.post('/auth/login', (req, res) => {
   const { email, password } = req.body;
@@ -29,44 +34,34 @@ router.use((req, res, next) => {
   authenticate(req, res, next);
 });
 
-// Store active SSE clients
-const sseClients = new Set<Response>();
-
+// ----------------------------------------------------------------------------
+// 1. Real-Time Server-Sent Events (SSE) & WebSocket Hub Stream
+// ----------------------------------------------------------------------------
 export function broadcastSSE(data: any) {
-  const payload = `data: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) {
-    try {
-      client.write(payload);
-    } catch {
-      sseClients.delete(client);
-    }
-  }
+  realtimeHub.broadcast(data);
 }
 
-// ----------------------------------------------------------------------------
-// 1. Real-Time Server-Sent Events (SSE) Stream
-// ----------------------------------------------------------------------------
 router.get('/events', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  sseClients.add(res);
+  realtimeHub.addSSEClient(res);
 
   // Send initial connected ping
   res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`);
 
   req.on('close', () => {
-    sseClients.delete(res);
+    realtimeHub.removeSSEClient(res);
   });
 });
 
-// Broadcast db events automatically
+// Broadcast db events automatically to both SSE & WebSocket clients
 const origEmit = db.emitEvent.bind(db);
 db.emitEvent = (event) => {
   origEmit(event);
-  broadcastSSE({ type: 'event', event });
+  realtimeHub.broadcast({ type: 'event', event });
 };
 
 // ----------------------------------------------------------------------------
@@ -284,6 +279,26 @@ router.get('/jobs/:id', (req: Request, res: Response) => {
 router.post('/jobs', (req: Request, res: Response) => {
   const idempotencyKey = (req.headers['idempotency-key'] as string) || req.body.idempotencyKey;
   const projectId = req.body.projectId || 'proj-prod';
+  const targetQueueId = req.body.queueId || Array.from(db.queues.values())[0]?.id || 'q-critical';
+
+  // Rate Limiting Enforcement (Token Bucket)
+  if (req.body.bypassRateLimit !== true) {
+    const rateCheck = rateLimiter.consume(targetQueueId, Array.isArray(req.body.jobs) ? req.body.jobs.length : 1);
+    if (!rateCheck.allowed) {
+      const retryAfterSec = Math.ceil((rateCheck.retryAfterMs || 2000) / 1000);
+      res.setHeader('Retry-After', retryAfterSec.toString());
+      res.setHeader('X-RateLimit-Remaining', rateCheck.remainingTokens.toString());
+      res.setHeader('X-RateLimit-Limit', rateCheck.capacity.toString());
+      return res.status(429).json({
+        error: 'Too Many Requests',
+        message: `Queue [${targetQueueId}] ingestion rate limit exceeded. Token bucket depleted.`,
+        retryAfterSeconds: retryAfterSec,
+        retryAfterMs: rateCheck.retryAfterMs,
+        availableTokens: rateCheck.remainingTokens,
+        burstCapacity: rateCheck.capacity
+      });
+    }
+  }
 
   // 1. Idempotency Check
   if (idempotencyKey) {
@@ -827,3 +842,253 @@ router.get('/metrics', (req: Request, res: Response) => {
     history: db.throughputHistory
   });
 });
+
+// ----------------------------------------------------------------------------
+// 12. Distributed Locking Endpoints
+// ----------------------------------------------------------------------------
+router.get('/locks', (req: Request, res: Response) => {
+  const locks = lockManager.getAll();
+  const contentions = lockManager.getContentionLog();
+  res.json({ locks, contentions, activeCount: locks.length });
+});
+
+router.post('/locks/acquire', requirePermission('MANAGE_LOCKS'), (req: Request, res: Response) => {
+  const { key, workerId = 'w-manual-admin', workerName = 'admin-operator', ttlMs = 30000, metadata } = req.body;
+  if (!key) return res.status(400).json({ error: 'Lock key is required' });
+
+  const result = lockManager.acquire({ key, workerId, workerName, ttlMs: Number(ttlMs), metadata });
+  if (!result.success) {
+    return res.status(409).json({ error: 'Lock Acquisition Failed', details: result.error });
+  }
+
+  res.status(201).json({ message: `Distributed lock [${key}] acquired successfully`, lock: result.lock, fencingToken: result.fencingToken });
+});
+
+router.post('/locks/renew', (req: Request, res: Response) => {
+  const { key, workerId, fencingToken, extendTtlMs = 30000 } = req.body;
+  if (!key || !workerId || fencingToken === undefined) {
+    return res.status(400).json({ error: 'key, workerId, and fencingToken are required' });
+  }
+
+  const result = lockManager.renew({ key, workerId, fencingToken: Number(fencingToken), extendTtlMs: Number(extendTtlMs) });
+  if (!result.success) {
+    return res.status(403).json({ error: 'Lock Renewal Failed', details: result.error });
+  }
+
+  res.json({ message: `Lock lease renewed for key [${key}]`, lock: result.lock });
+});
+
+router.post('/locks/release', requirePermission('MANAGE_LOCKS'), (req: Request, res: Response) => {
+  const { key, workerId = 'w-manual-admin', fencingToken } = req.body;
+  if (!key) return res.status(400).json({ error: 'key is required' });
+
+  const result = lockManager.release({ key, workerId, fencingToken: fencingToken ? Number(fencingToken) : undefined });
+  if (!result.success) {
+    return res.status(400).json({ error: 'Lock Release Failed', details: result.error });
+  }
+
+  res.json({ message: `Distributed lock [${key}] successfully released` });
+});
+
+router.post('/locks/test-contention', (req: Request, res: Response) => {
+  const testKey = 'resource:warehouse:s3_parquet_compact';
+  // Attempt concurrent acquisition with different simulated worker
+  const result = lockManager.acquire({
+    key: testKey,
+    workerId: 'w-contender-99',
+    workerName: 'worker-contender-node',
+    ttlMs: 20000
+  });
+
+  res.json({
+    testKey,
+    contentionObserved: !result.success,
+    outcome: result.success ? 'ACQUIRED_FRESH' : 'MUTUAL_EXCLUSION_ENFORCED',
+    details: result.error || 'Acquired because lease had lapsed'
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 13. Queue Sharding & Consistent Hashing Endpoints
+// ----------------------------------------------------------------------------
+router.get('/shards', (req: Request, res: Response) => {
+  const shards = shardingEngine.getShards();
+  const topology = shardingEngine.getRingTopology();
+  res.json({ shards, topology });
+});
+
+router.post('/shards/route', (req: Request, res: Response) => {
+  const { partitionKey = 'tenant-acme-prod' } = req.body;
+  const route = shardingEngine.routeKey(partitionKey);
+  res.json({ partitionKey, route });
+});
+
+router.post('/shards/rebalance', requirePermission('MANAGE_SHARDS'), (req: Request, res: Response) => {
+  const { targetShardCount = 5 } = req.body;
+  const updatedShards = shardingEngine.rebalanceShards(Number(targetShardCount));
+  res.json({
+    message: `Sharding ring rebalanced across ${updatedShards.length} physical shard clusters`,
+    shards: updatedShards
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 14. Event-Driven Execution & Trigger Rules Endpoints
+// ----------------------------------------------------------------------------
+router.get('/event-rules', (req: Request, res: Response) => {
+  const rules = eventBus.getRules();
+  const history = eventBus.getEventHistory();
+  res.json({ rules, history });
+});
+
+router.post('/event-rules', requirePermission('MANAGE_RULES'), (req: Request, res: Response) => {
+  const newRule = eventBus.createRule(req.body);
+  res.status(201).json(newRule);
+});
+
+router.patch('/event-rules/:id/toggle', requirePermission('MANAGE_RULES'), (req: Request, res: Response) => {
+  const { enabled } = req.body;
+  const success = eventBus.toggleRule(req.params.id, Boolean(enabled));
+  if (!success) return res.status(404).json({ error: 'Rule not found' });
+  res.json({ message: `Rule ${req.params.id} updated`, enabled });
+});
+
+router.post('/events/publish', requirePermission('CREATE_JOBS'), (req: Request, res: Response) => {
+  const { eventName, source = 'api_manual_trigger', payload = {} } = req.body;
+  if (!eventName) return res.status(400).json({ error: 'eventName is required' });
+
+  const result = eventBus.publish({ eventName, source, payload });
+  res.json({
+    message: `Event [${eventName}] published to bus`,
+    matchedRules: result.matchedRules,
+    spawnedJobIds: result.spawnedJobIds,
+    messageId: result.messageId
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 15. Rate Limiting & Token Bucket Status
+// ----------------------------------------------------------------------------
+router.get('/rate-limits/status', (req: Request, res: Response) => {
+  const statuses = rateLimiter.getAllStatuses();
+  res.json({ statuses });
+});
+
+router.patch('/queues/:id/rate-limit', requirePermission('MANAGE_QUEUES'), (req: Request, res: Response) => {
+  const { rateLimitPerMin } = req.body;
+  if (!rateLimitPerMin) return res.status(400).json({ error: 'rateLimitPerMin is required' });
+
+  rateLimiter.updateQueueLimit(req.params.id, Number(rateLimitPerMin));
+  res.json({ message: `Rate limit updated for queue ${req.params.id}`, rateLimitPerMin: Number(rateLimitPerMin) });
+});
+
+router.post('/rate-limits/test-burst', (req: Request, res: Response) => {
+  const { queueId = 'q-critical', count = 25 } = req.body;
+  const results: { attempt: number; allowed: boolean; remainingTokens: number; retryAfterMs?: number }[] = [];
+
+  for (let i = 1; i <= Math.min(50, Number(count)); i++) {
+    const outcome = rateLimiter.consume(queueId, 1);
+    results.push({
+      attempt: i,
+      allowed: outcome.allowed,
+      remainingTokens: outcome.remainingTokens,
+      retryAfterMs: outcome.retryAfterMs
+    });
+  }
+
+  const allowedCount = results.filter(r => r.allowed).length;
+  const throttledCount = results.filter(r => !r.allowed).length;
+
+  res.json({
+    queueId,
+    totalBurstAttempts: results.length,
+    allowedCount,
+    throttledCount,
+    firstThrottledAtAttempt: results.findIndex(r => !r.allowed) + 1 || null,
+    attempts: results
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 16. AI-Generated Failure Diagnosis (Gemini 3.7 Flash)
+// ----------------------------------------------------------------------------
+router.post('/ai/diagnose', async (req: Request, res: Response) => {
+  const { jobName = 'Unknown Job', queueName = 'General', errorMessage, errorStack, payload = {}, attemptsCount = 3 } = req.body;
+  if (!errorMessage) return res.status(400).json({ error: 'errorMessage is required for AI diagnosis' });
+
+  try {
+    const diagnosis = await diagnoseJobFailure({
+      jobName,
+      queueName,
+      errorMessage,
+      errorStack,
+      payload,
+      attemptsCount: Number(attemptsCount)
+    });
+    res.json({ diagnosis });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to generate AI failure diagnosis', details: err.message });
+  }
+});
+
+router.post('/dlq/:id/diagnose', async (req: Request, res: Response) => {
+  const dlqItem = db.dlq.get(req.params.id);
+  if (!dlqItem) return res.status(404).json({ error: 'DLQ item not found' });
+
+  try {
+    const diagnosis = await diagnoseJobFailure({
+      jobName: dlqItem.jobName,
+      queueName: dlqItem.queueName,
+      errorMessage: dlqItem.failedReason,
+      errorStack: dlqItem.errorStack,
+      payload: dlqItem.payload,
+      attemptsCount: dlqItem.attemptsCount
+    });
+
+    dlqItem.aiDiagnosis = diagnosis;
+    res.json({ message: 'AI failure diagnosis generated successfully', diagnosis, dlqItem });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to diagnose DLQ item', details: err.message });
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 17. RBAC Roles & Permissions Inspection
+// ----------------------------------------------------------------------------
+router.get('/rbac/permissions', (req: Request, res: Response) => {
+  res.json({
+    roles: ['admin', 'operator', 'developer', 'viewer'],
+    matrix: ROLE_PERMISSIONS
+  });
+});
+
+router.post('/rbac/switch-role', (req: Request, res: Response) => {
+  const { role } = req.body;
+  if (!['admin', 'operator', 'developer', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  // Find or create test user for this role
+  let user = Array.from(db.users.values()).find(u => u.role === role);
+  if (!user) {
+    user = {
+      id: `usr-${role}`,
+      name: `${role.charAt(0).toUpperCase() + role.slice(1)} User`,
+      email: `${role}@hyperplane.io`,
+      role: role as Role,
+      organizationId: 'org-main',
+      permissions: ROLE_PERMISSIONS[role as Role]
+    };
+    db.users.set(user.id, user);
+  }
+
+  const token = generateToken(user.id, user.role, user.organizationId);
+  res.json({
+    token,
+    user: {
+      ...user,
+      permissions: ROLE_PERMISSIONS[role as Role]
+    }
+  });
+});
+

@@ -123,53 +123,53 @@ export const WorkerFleet: React.FC<WorkerFleetProps> = ({
         </form>
       </div>
 
-      {/* Cluster Stats Summary */}
+      {/* Cluster Stats Summary (4 distinct colored decks) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-1">
+        <div className="p-4 bg-gradient-to-br from-sky-950/30 via-stone-900/90 to-stone-900/90 border border-sky-500/30 hover:border-sky-400/60 rounded-xl space-y-1 shadow-sm transition-all">
           <div className="flex items-center space-x-2 text-[10px] text-stone-400 uppercase font-semibold">
-            <div className="w-4 h-4 rounded bg-sky-400/10 text-sky-300 flex items-center justify-center border border-sky-400/20">
-              <Server className="w-2.5 h-2.5" />
+            <div className="w-5 h-5 rounded-md bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-400/30">
+              <Server className="w-3 h-3" />
             </div>
             <span>Active Fleet Nodes</span>
           </div>
-          <div className="text-xl font-bold font-mono text-stone-100 mt-1">
-            {activeNodes.length} <span className="text-xs text-stone-500 font-normal">/ {workers.length} total</span>
+          <div className="text-xl font-bold font-mono text-sky-300 mt-1">
+            {activeNodes.length} <span className="text-xs text-stone-400 font-normal">/ {workers.length} total</span>
           </div>
         </div>
 
-        <div className="p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-1">
+        <div className="p-4 bg-gradient-to-br from-indigo-950/30 via-stone-900/90 to-stone-900/90 border border-indigo-500/30 hover:border-indigo-400/60 rounded-xl space-y-1 shadow-sm transition-all">
           <div className="flex items-center space-x-2 text-[10px] text-stone-400 uppercase font-semibold">
-            <div className="w-4 h-4 rounded bg-sky-400/10 text-sky-300 flex items-center justify-center border border-sky-400/20">
-              <Activity className="w-2.5 h-2.5" />
+            <div className="w-5 h-5 rounded-md bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-400/30">
+              <Activity className="w-3 h-3" />
             </div>
             <span>Concurrent Slot Capacity</span>
           </div>
-          <div className="text-xl font-bold font-mono text-sky-300 mt-1">
-            {activeJobs} <span className="text-xs text-stone-500 font-normal">/ {totalConcurrency} active</span>
+          <div className="text-xl font-bold font-mono text-indigo-300 mt-1">
+            {activeJobs} <span className="text-xs text-stone-400 font-normal">/ {totalConcurrency} active</span>
           </div>
         </div>
 
-        <div className="p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-1">
+        <div className="p-4 bg-gradient-to-br from-emerald-950/30 via-stone-900/90 to-stone-900/90 border border-emerald-500/30 hover:border-emerald-400/60 rounded-xl space-y-1 shadow-sm transition-all">
           <div className="flex items-center space-x-2 text-[10px] text-stone-400 uppercase font-semibold">
-            <div className="w-4 h-4 rounded bg-emerald-400/10 text-emerald-300 flex items-center justify-center border border-emerald-400/20">
-              <CheckCircle className="w-2.5 h-2.5" />
+            <div className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30">
+              <CheckCircle className="w-3 h-3" />
             </div>
             <span>Avg Heartbeat Latency</span>
           </div>
           <div className="text-xl font-bold font-mono text-emerald-300 mt-1">
-            &lt; 3.0s <span className="text-xs text-stone-500 font-normal">(Healthy)</span>
+            &lt; 3.0s <span className="text-xs text-stone-400 font-normal">(Healthy)</span>
           </div>
         </div>
 
-        <div className="p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-1">
+        <div className="p-4 bg-gradient-to-br from-fuchsia-950/30 via-stone-900/90 to-stone-900/90 border border-fuchsia-500/30 hover:border-fuchsia-400/60 rounded-xl space-y-1 shadow-sm transition-all">
           <div className="flex items-center space-x-2 text-[10px] text-stone-400 uppercase font-semibold">
-            <div className="w-4 h-4 rounded bg-fuchsia-400/10 text-fuchsia-300 flex items-center justify-center border border-fuchsia-400/20">
-              <Clock className="w-2.5 h-2.5" />
+            <div className="w-5 h-5 rounded-md bg-fuchsia-500/20 text-fuchsia-300 flex items-center justify-center border border-fuchsia-400/30">
+              <Clock className="w-3 h-3" />
             </div>
             <span>Lease Recovery Reaper</span>
           </div>
           <div className="text-xl font-bold font-mono text-fuchsia-300 mt-1">
-            15s <span className="text-xs text-stone-500 font-normal">TTL threshold</span>
+            15s <span className="text-xs text-stone-400 font-normal">TTL threshold</span>
           </div>
         </div>
       </div>
@@ -180,15 +180,21 @@ export const WorkerFleet: React.FC<WorkerFleetProps> = ({
           const isShutdown = worker.status === 'SHUTDOWN';
           const concurrencyPct = Math.round((worker.activeJobsCount / worker.concurrencyLimit) * 100);
 
+          const workerDeckStyle = worker.status === 'BUSY'
+            ? 'bg-gradient-to-br from-sky-950/30 via-stone-900/95 to-stone-900 border-sky-500/30 hover:border-sky-400/60'
+            : worker.status === 'HEALTHY' || worker.status === 'IDLE'
+            ? 'bg-gradient-to-br from-emerald-950/30 via-stone-900/95 to-stone-900 border-emerald-500/30 hover:border-emerald-400/60'
+            : worker.status === 'PAUSED'
+            ? 'bg-gradient-to-br from-amber-950/30 via-stone-900/95 to-stone-900 border-amber-500/30 hover:border-amber-400/60'
+            : worker.status === 'STALLED'
+            ? 'bg-gradient-to-br from-rose-950/30 via-stone-900/95 to-stone-900 border-rose-500/40 hover:border-rose-400/70'
+            : 'bg-stone-950/40 border-stone-800/40 opacity-60';
+
           return (
             <div
               key={worker.id}
               id={`worker-node-${worker.id}`}
-              className={`bg-stone-900/90 border rounded-2xl p-5 shadow-sm space-y-4 transition-all ${
-                isShutdown
-                  ? 'border-stone-800/40 opacity-60 bg-stone-950/40'
-                  : 'border-stone-800 hover:border-sky-400/30'
-              }`}
+              className={`border rounded-2xl p-5 shadow-sm space-y-4 transition-all ${workerDeckStyle}`}
             >
               {/* Header */}
               <div className="flex items-start justify-between">

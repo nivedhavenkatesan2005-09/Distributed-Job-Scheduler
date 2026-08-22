@@ -15,10 +15,15 @@ import { ApiDocsView } from './components/ApiDocsView';
 import { DesignDecisionsView } from './components/DesignDecisionsView';
 import { AutomatedTestRunner } from './components/AutomatedTestRunner';
 import { AlertThresholdModal } from './components/AlertThresholdModal';
-import { AlertBanner } from './components/AlertBanner';
 import { RecurringSchedulesView } from './components/RecurringSchedulesView';
 import { WebhooksView } from './components/WebhooksView';
 import { ExecutionTimelineView } from './components/ExecutionTimelineView';
+import { DistributedLockingView } from './components/DistributedLockingView';
+import { QueueShardingView } from './components/QueueShardingView';
+import { EventDrivenView } from './components/EventDrivenView';
+import { RateLimitingModal } from './components/RateLimitingModal';
+import { RbacMatrixModal } from './components/RbacMatrixModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 
 import {
   Project,
@@ -33,7 +38,13 @@ import {
   Role,
   AlertThresholdConfig,
   ActiveAlertNotification,
-  ThemeMode
+  ThemeMode,
+  DistributedLock,
+  ShardNode,
+  ShardPartitionRoute,
+  EventTriggerRule,
+  EventBusMessage,
+  TokenBucketStatus
 } from './types';
 
 const DEFAULT_ALERT_CONFIG: AlertThresholdConfig = {
@@ -113,6 +124,18 @@ export function App() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [events, setEvents] = useState<SystemEvent[]>([]);
 
+  // Advanced Distributed & Realtime States
+  const [locks, setLocks] = useState<DistributedLock[]>([]);
+  const [lockContentions, setLockContentions] = useState<any[]>([]);
+  const [shards, setShards] = useState<ShardNode[]>([]);
+  const [eventRules, setEventRules] = useState<EventTriggerRule[]>([]);
+  const [eventHistory, setEventHistory] = useState<EventBusMessage[]>([]);
+  const [rateLimitStatuses, setRateLimitStatuses] = useState<TokenBucketStatus[]>([]);
+  const [isRateLimitModalOpen, setIsRateLimitModalOpen] = useState(false);
+  const [isRbacModalOpen, setIsRbacModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isWsConnected, setIsWsConnected] = useState<boolean>(false);
+
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedJobLogs, setSelectedJobLogs] = useState<any[]>([]);
   const [selectedQueueFilter, setSelectedQueueFilter] = useState<string>('ALL');
@@ -120,6 +143,74 @@ export function App() {
   const [isSseConnected, setIsSseConnected] = useState<boolean>(false);
   const [isDiagnosingAi, setIsDiagnosingAi] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Global Keyboard Shortcuts (CMD/CTRL + K, Alt+1..9, [, ])
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // 1. Toggle Command Palette with Cmd+K or Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsCommandPaletteOpen(prev => !prev);
+        return;
+      }
+
+      // Check if typing inside form inputs
+      const target = e.target as HTMLElement | null;
+      const isInput = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      );
+
+      if (isInput) return;
+
+      // 2. Direct tab shortcuts with Alt + 1..9
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const keyNum = parseInt(e.key, 10);
+        const quickTabs = [
+          'dashboard', // Alt + 1
+          'queues',    // Alt + 2
+          'jobs',      // Alt + 3
+          'dlq',       // Alt + 4
+          'locks',     // Alt + 5
+          'shards',    // Alt + 6
+          'events',    // Alt + 7
+          'workflows', // Alt + 8
+          'timeline'   // Alt + 9
+        ];
+        if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= quickTabs.length) {
+          e.preventDefault();
+          setActiveTab(quickTabs[keyNum - 1]);
+          return;
+        }
+      }
+
+      // 3. Tab cycling with [ and ] or Alt + Left / Right
+      const allOrderedTabs = [
+        'dashboard', 'queues', 'jobs', 'dlq', 'locks', 'shards',
+        'events', 'workflows', 'schedules', 'webhooks',
+        'timeline', 'workers', 'logs', 'schema', 'architecture',
+        'api-docs', 'design-decisions', 'tests'
+      ];
+
+      if ((e.altKey && e.key === 'ArrowRight') || e.key === ']') {
+        e.preventDefault();
+        const currentIndex = allOrderedTabs.indexOf(activeTab);
+        const nextIndex = (currentIndex + 1) % allOrderedTabs.length;
+        setActiveTab(allOrderedTabs[nextIndex]);
+      } else if ((e.altKey && e.key === 'ArrowLeft') || e.key === '[') {
+        e.preventDefault();
+        const currentIndex = allOrderedTabs.indexOf(activeTab);
+        const prevIndex = (currentIndex - 1 + allOrderedTabs.length) % allOrderedTabs.length;
+        setActiveTab(allOrderedTabs[prevIndex]);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [activeTab]);
 
   // Alert Thresholds State
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -378,7 +469,11 @@ export function App() {
         workersRes,
         dlqRes,
         wfRes,
-        metricsRes
+        metricsRes,
+        locksRes,
+        shardsRes,
+        eventRulesRes,
+        rateLimitsRes
       ] = await Promise.all([
         safeFetchJson('/api/auth/me'),
         safeFetchJson('/api/projects'),
@@ -387,7 +482,11 @@ export function App() {
         safeFetchJson('/api/workers'),
         safeFetchJson('/api/dlq'),
         safeFetchJson('/api/workflows'),
-        safeFetchJson('/api/metrics')
+        safeFetchJson('/api/metrics'),
+        safeFetchJson('/api/locks'),
+        safeFetchJson('/api/shards'),
+        safeFetchJson('/api/event-rules'),
+        safeFetchJson('/api/rate-limits/status')
       ]);
 
       if (authRes?.user) setCurrentUser(authRes.user);
@@ -398,6 +497,16 @@ export function App() {
       if (Array.isArray(dlqRes)) setDlqItems(dlqRes);
       if (Array.isArray(wfRes)) setWorkflows(wfRes);
       if (metricsRes) setMetrics(metricsRes);
+      if (locksRes?.locks) {
+        setLocks(locksRes.locks);
+        if (locksRes.contentions) setLockContentions(locksRes.contentions);
+      }
+      if (shardsRes?.shards) setShards(shardsRes.shards);
+      if (eventRulesRes?.rules) {
+        setEventRules(eventRulesRes.rules);
+        if (eventRulesRes.history) setEventHistory(eventRulesRes.history);
+      }
+      if (rateLimitsRes?.statuses) setRateLimitStatuses(rateLimitsRes.statuses);
     } catch (err) {
       console.warn('[Client] Initial data fetch warning:', err);
     }
@@ -409,13 +518,49 @@ export function App() {
     }
   }, [fetchData, authToken]);
 
-  // 2. Real-Time SSE Stream with Polling Fallback
+  // 2. Real-Time WebSocket Connection with SSE & Polling Fallback
   useEffect(() => {
     if (!authToken) return;
 
+    let ws: WebSocket | null = null;
     let eventSource: EventSource | null = null;
     let fallbackInterval: NodeJS.Timeout | null = null;
 
+    // A. Connect WebSocket
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        setIsWsConnected(true);
+        setIsSseConnected(true);
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload.type === 'event' && payload.event) {
+            setEvents(prev => [payload.event, ...prev.slice(0, 150)]);
+          }
+          fetchData();
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      ws.onclose = () => {
+        setIsWsConnected(false);
+      };
+
+      ws.onerror = () => {
+        setIsWsConnected(false);
+      };
+    } catch {
+      setIsWsConnected(false);
+    }
+
+    // B. SSE Fallback
     try {
       eventSource = new EventSource('/api/events');
 
@@ -429,7 +574,6 @@ export function App() {
           if (payload.type === 'event' && payload.event) {
             setEvents(prev => [payload.event, ...prev.slice(0, 150)]);
           }
-          // Debounced state refresh
           fetchData();
         } catch {
           // ignore parse errors
@@ -443,12 +587,13 @@ export function App() {
       setIsSseConnected(false);
     }
 
-    // Polling interval as reliable backup
+    // C. Backup Polling Interval
     fallbackInterval = setInterval(() => {
       fetchData();
-    }, 2000);
+    }, 2500);
 
     return () => {
+      if (ws) ws.close();
       if (eventSource) eventSource.close();
       if (fallbackInterval) clearInterval(fallbackInterval);
     };
@@ -697,6 +842,189 @@ export function App() {
     }
   };
 
+  // 11. Distributed Locking Handlers
+  const handleAcquireLock = async (key: string, ttlMs: number, workerId: string) => {
+    try {
+      const res = await safeFetchJson('/api/locks/acquire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, ttlMs, workerId })
+      });
+      if (res?.success) {
+        showToast(`Acquired distributed lock "${key}" (fencing token #${res.lock.fencingToken})`);
+      } else {
+        showToast(`Lock acquisition failed: ${res?.message || 'Lock held by another worker'}`);
+      }
+      fetchData();
+      return res;
+    } catch (err: any) {
+      showToast(`Lock acquisition error: ${err?.message}`);
+    }
+  };
+
+  const handleRenewLock = async (key: string, workerId: string, fencingToken: number, ttlMs: number) => {
+    try {
+      const res = await safeFetchJson('/api/locks/renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, workerId, fencingToken, ttlMs })
+      });
+      if (res?.success) {
+        showToast(`Renewed heartbeat lease on lock "${key}" (+${ttlMs}ms)`);
+      } else {
+        showToast(`Failed to renew lock: ${res?.message}`);
+      }
+      fetchData();
+    } catch (err: any) {
+      showToast(`Renew error: ${err?.message}`);
+    }
+  };
+
+  const handleReleaseLock = async (key: string, workerId: string, fencingToken: number) => {
+    try {
+      const res = await safeFetchJson('/api/locks/release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, workerId, fencingToken })
+      });
+      if (res?.success) {
+        showToast(`Released distributed lock "${key}"`);
+      } else {
+        showToast(`Release failed: ${res?.message}`);
+      }
+      fetchData();
+    } catch (err: any) {
+      showToast(`Release error: ${err?.message}`);
+    }
+  };
+
+  const handleTestContention = async () => {
+    try {
+      const res = await safeFetchJson('/api/locks/test-contention', { method: 'POST' });
+      showToast(res?.message || 'Contention simulation completed');
+      fetchData();
+    } catch (err: any) {
+      showToast(`Contention test error: ${err?.message}`);
+    }
+  };
+
+  // 12. Queue Sharding Handlers
+  const handleRouteKey = async (routingKey: string) => {
+    try {
+      const res = await safeFetchJson(`/api/shards/route?key=${encodeURIComponent(routingKey)}`);
+      return res?.route;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleRebalanceShards = async (targetCount: number) => {
+    try {
+      const res = await safeFetchJson('/api/shards/rebalance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shardCount: targetCount })
+      });
+      showToast(res?.message || `Consistent hash ring rebalanced to ${targetCount} partitions`);
+      fetchData();
+    } catch (err: any) {
+      showToast(`Rebalance error: ${err?.message}`);
+    }
+  };
+
+  // 13. Event-Driven Execution Handlers
+  const handleToggleEventRule = async (ruleId: string, enabled: boolean) => {
+    try {
+      const res = await safeFetchJson(`/api/event-rules/${ruleId}/toggle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      showToast(res?.message || `Rule updated`);
+      fetchData();
+    } catch (err: any) {
+      showToast(`Rule update error: ${err?.message}`);
+    }
+  };
+
+  const handlePublishEvent = async (eventName: string, payload: any) => {
+    try {
+      const res = await safeFetchJson('/api/event-rules/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventName, payload })
+      });
+      showToast(`Published event "${eventName}" → triggered ${res?.triggeredJobs?.length || 0} async jobs`);
+      fetchData();
+    } catch (err: any) {
+      showToast(`Publish error: ${err?.message}`);
+    }
+  };
+
+  const handleCreateEventRule = async (ruleData: any) => {
+    try {
+      const res = await safeFetchJson('/api/event-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ruleData)
+      });
+      showToast(`Created event rule "${ruleData.name}"`);
+      fetchData();
+    } catch (err: any) {
+      showToast(`Create rule error: ${err?.message}`);
+    }
+  };
+
+  // 14. Rate Limiting Handlers
+  const handleUpdateRateLimit = async (queueId: string, maxRequestsPerMinute: number) => {
+    try {
+      const res = await safeFetchJson(`/api/rate-limits/queues/${queueId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxRequestsPerMinute })
+      });
+      showToast(res?.message || 'Rate limit updated');
+      fetchData();
+    } catch (err: any) {
+      showToast(`Rate limit update error: ${err?.message}`);
+    }
+  };
+
+  const handleTestBurst = async (queueId: string, count: number) => {
+    try {
+      const res = await safeFetchJson('/api/rate-limits/test-burst', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queueId, count })
+      });
+      showToast(res?.message || `Burst test completed: ${res?.results?.accepted || 0} accepted, ${res?.results?.throttled || 0} throttled (HTTP 429)`);
+      fetchData();
+    } catch (err: any) {
+      showToast(`Burst test error: ${err?.message}`);
+    }
+  };
+
+  // 15. RBAC Switching Handler
+  const handleSwitchRole = async (role: Role) => {
+    try {
+      const res = await safeFetchJson('/api/rbac/switch-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role })
+      });
+      if (res?.user) {
+        setCurrentUser(res.user);
+        try {
+          localStorage.setItem('hyperplane_user', JSON.stringify(res.user));
+        } catch {}
+      }
+      showToast(`Active RBAC role set to ${role.toUpperCase()}`);
+      fetchData();
+    } catch (err: any) {
+      showToast(`Role switch error: ${err?.message}`);
+    }
+  };
+
   if (!authToken || !currentUser) {
     return <LoginScreen onLogin={handleLogin} />;
   }
@@ -718,6 +1046,7 @@ export function App() {
         dlqCount={dlqItems.filter(d => !d.resolvedAt).length}
         activeAlertCount={activeAlerts.length}
         onOpenAlertSettings={() => setIsAlertModalOpen(true)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         currentTheme={theme}
         onSelectTheme={setTheme}
         onLogout={handleLogout}
@@ -726,16 +1055,6 @@ export function App() {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         
-        {/* Real-time KPI Threshold Breach Alert Banner */}
-        <AlertBanner
-          alerts={activeAlerts}
-          onDismissAlert={handleDismissAlert}
-          onDismissAll={handleDismissAllAlerts}
-          onOpenThresholdModal={() => setIsAlertModalOpen(true)}
-          onNavigateToTab={(tab) => setActiveTab(tab)}
-          onScaleWorkers={(count) => handleScaleFleet(count)}
-        />
-
         {/* Tab Views Router */}
         {activeTab === 'dashboard' && (
           <>
@@ -767,6 +1086,7 @@ export function App() {
             onPurgeQueue={handlePurgeQueue}
             onUpdateQueue={handleUpdateQueue}
             onCreateQueue={handleCreateQueue}
+            onOpenRateLimits={() => setIsRateLimitModalOpen(true)}
             onSelectQueueForFilter={(qId) => {
               setSelectedQueueFilter(qId);
               setActiveTab('jobs');
@@ -839,6 +1159,39 @@ export function App() {
           />
         )}
 
+        {activeTab === 'locks' && (
+          <DistributedLockingView
+            locks={locks}
+            workers={workers}
+            contentions={lockContentions}
+            currentUserRole={currentUser?.role || 'admin'}
+            onAcquireLock={handleAcquireLock}
+            onRenewLock={handleRenewLock}
+            onReleaseLock={handleReleaseLock}
+            onTestContention={handleTestContention}
+          />
+        )}
+
+        {activeTab === 'shards' && (
+          <QueueShardingView
+            shards={shards}
+            onRouteKey={handleRouteKey}
+            onRebalanceShards={handleRebalanceShards}
+          />
+        )}
+
+        {activeTab === 'events' && (
+          <EventDrivenView
+            rules={eventRules}
+            eventHistory={eventHistory}
+            queues={queues}
+            currentUserRole={currentUser?.role || 'admin'}
+            onToggleRule={handleToggleEventRule}
+            onPublishEvent={handlePublishEvent}
+            onCreateRule={handleCreateEventRule}
+          />
+        )}
+
         {activeTab === 'logs' && (
           <LiveLogStream
             events={events}
@@ -890,6 +1243,42 @@ export function App() {
           onTriggerTestAlert={handleTriggerTestAlert}
         />
       )}
+
+      {/* Rate Limiting Configuration Modal */}
+      {isRateLimitModalOpen && (
+        <RateLimitingModal
+          queues={queues}
+          statuses={rateLimitStatuses}
+          onUpdateLimit={handleUpdateRateLimit}
+          onTestBurst={handleTestBurst}
+          onClose={() => setIsRateLimitModalOpen(false)}
+        />
+      )}
+
+      {/* RBAC Permissions Matrix Modal */}
+      {isRbacModalOpen && (
+        <RbacMatrixModal
+          currentUser={currentUser}
+          onSwitchRole={handleSwitchRole}
+          onClose={() => setIsRbacModalOpen(false)}
+        />
+      )}
+
+      {/* Global Command Palette / Quick Switcher Modal (CMD/CTRL + K) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onSpawnTraffic={handleSpawnTraffic}
+        onOpenAlertSettings={() => setIsAlertModalOpen(true)}
+        onOpenRateLimitModal={() => setIsRateLimitModalOpen(true)}
+        onOpenRbacModal={() => setIsRbacModalOpen(true)}
+        onSelectTheme={setTheme}
+        currentTheme={theme}
+        dlqCount={dlqItems.filter(d => !d.resolvedAt).length}
+        currentUser={currentUser}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

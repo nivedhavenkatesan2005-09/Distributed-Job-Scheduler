@@ -48,12 +48,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Top Section: Real-Time Throughput Visualizer & Fleet Load */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left (2 cols): Real-Time Throughput / Minute Stream */}
-        <div className="lg:col-span-2 bg-stone-900/90 border border-stone-800 p-5 rounded-2xl space-y-4 shadow-sm">
+        {/* Left (2 cols): Real-Time Throughput / Minute Stream (Cyan / Sky Deck) */}
+        <div className="lg:col-span-2 bg-gradient-to-br from-sky-950/25 via-stone-900/90 to-stone-900/90 border border-sky-500/30 hover:border-sky-500/50 p-5 rounded-2xl space-y-4 shadow-sm shadow-sky-950/20 transition-all">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <h3 className="text-sm font-bold text-stone-100 flex items-center space-x-2.5">
-                <div className="w-6 h-6 rounded-lg bg-sky-400/10 border border-sky-400/20 flex items-center justify-center text-sky-300 shadow-sm shadow-sky-500/5">
+                <div className="w-6 h-6 rounded-lg bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300 shadow-sm shadow-sky-500/10">
                   <TrendingUp className="w-3.5 h-3.5" />
                 </div>
                 <span>Distributed Throughput & Backlog Telemetry</span>
@@ -111,10 +111,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right (1 col): System Health & Quick Actions */}
-        <div className="bg-stone-900/90 border border-stone-800 p-5 rounded-2xl space-y-4 shadow-sm">
+        {/* Right (1 col): System Health & Quick Actions (Amber / Orange Deck) */}
+        <div className="bg-gradient-to-br from-amber-950/25 via-stone-900/90 to-stone-900/90 border border-amber-500/30 hover:border-amber-500/50 p-5 rounded-2xl space-y-4 shadow-sm shadow-amber-950/20 transition-all">
           <h3 className="text-sm font-bold text-stone-100 flex items-center space-x-2.5">
-            <div className="w-6 h-6 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-200 shadow-sm shadow-amber-500/5">
+            <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 shadow-sm shadow-amber-500/10">
               <Zap className="w-3.5 h-3.5" />
             </div>
             <span>Operational Controls</span>
@@ -123,7 +123,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="space-y-2">
             <button
               onClick={() => onSpawnTraffic(false)}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-stone-950 hover:bg-stone-800/80 border border-stone-800 hover:border-sky-400/30 text-xs font-semibold text-stone-200 transition-all text-left group cursor-pointer"
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-stone-950/90 hover:bg-stone-800/80 border border-stone-800 hover:border-sky-400/30 text-xs font-semibold text-stone-200 transition-all text-left group cursor-pointer"
             >
               <div className="flex items-center space-x-3">
                 <div className="w-7 h-7 rounded-lg bg-sky-400/10 border border-sky-400/20 flex items-center justify-center text-sky-300 shrink-0 group-hover:scale-105 transition-transform shadow-sm shadow-sky-500/5">
@@ -155,7 +155,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={() => onNavigateToTab('tests')}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-stone-950 hover:bg-stone-800/80 border border-stone-800 hover:border-emerald-400/30 text-xs font-semibold text-stone-200 transition-all text-left group cursor-pointer"
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-stone-950/90 hover:bg-stone-800/80 border border-stone-800 hover:border-emerald-400/30 text-xs font-semibold text-stone-200 transition-all text-left group cursor-pointer"
             >
               <div className="flex items-center space-x-3">
                 <div className="w-7 h-7 rounded-lg bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center text-emerald-300 shrink-0 group-hover:scale-105 transition-transform shadow-sm shadow-emerald-500/5">
@@ -170,7 +170,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          <div className="pt-2 border-t border-stone-800 text-[11px] text-stone-400 space-y-1">
+          <div className="pt-2 border-t border-stone-800/80 text-[11px] text-stone-400 space-y-1">
             <div className="flex justify-between">
               <span>Active Worker Nodes:</span>
               <span className="font-mono text-stone-200">{workers.filter(w => w.status !== 'SHUTDOWN').length} nodes</span>
@@ -184,18 +184,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       </div>
 
-      {/* Middle Section: Active Queues Overview */}
-      <div className="bg-stone-900/90 border border-stone-800 p-5 rounded-2xl space-y-4 shadow-sm">
+      {/* Middle Section: Active Queues Overview (Violet / Indigo Deck) */}
+      <div className="bg-gradient-to-br from-indigo-950/25 via-stone-900/90 to-stone-900/90 border border-indigo-500/30 hover:border-indigo-500/50 p-5 rounded-2xl space-y-4 shadow-sm shadow-indigo-950/20 transition-all">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-stone-100 flex items-center space-x-2.5">
-            <div className="w-6 h-6 rounded-lg bg-sky-400/10 border border-sky-400/20 flex items-center justify-center text-sky-300 shadow-sm shadow-sky-500/5">
+            <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shadow-sm shadow-indigo-500/10">
               <Layers className="w-3.5 h-3.5" />
             </div>
             <span>Active Priority Queues</span>
           </h3>
           <button
             onClick={() => onNavigateToTab('queues')}
-            className="text-xs text-sky-300 hover:text-sky-200 font-semibold flex items-center space-x-1 cursor-pointer"
+            className="text-xs text-indigo-300 hover:text-indigo-200 font-semibold flex items-center space-x-1 cursor-pointer"
           >
             <span>Manage All ({queues.length})</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -203,58 +203,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {queues.slice(0, 4).map((q) => (
-            <div
-              key={q.id}
-              onClick={() => onNavigateToTab('queues')}
-              className="p-4 bg-stone-950/70 hover:bg-stone-850 border border-stone-800/80 hover:border-sky-400/30 rounded-xl cursor-pointer transition-all space-y-3 group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-stone-100 text-xs truncate group-hover:text-sky-200 transition-colors">{q.name}</span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-sky-400/10 text-sky-300 border border-sky-400/20">
-                  P{q.priority}
-                </span>
-              </div>
+          {queues.slice(0, 4).map((q, qIndex) => {
+            const queueColorThemes = [
+              { border: 'border-rose-500/40 hover:border-rose-400/70', bg: 'bg-gradient-to-b from-rose-950/30 to-stone-950/90', badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
+              { border: 'border-amber-500/40 hover:border-amber-400/70', bg: 'bg-gradient-to-b from-amber-950/30 to-stone-950/90', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+              { border: 'border-cyan-500/40 hover:border-cyan-400/70', bg: 'bg-gradient-to-b from-cyan-950/30 to-stone-950/90', badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
+              { border: 'border-emerald-500/40 hover:border-emerald-400/70', bg: 'bg-gradient-to-b from-emerald-950/30 to-stone-950/90', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' }
+            ];
+            const theme = queueColorThemes[qIndex % queueColorThemes.length];
 
-              <div className="grid grid-cols-3 gap-1 text-center font-mono">
-                <div className="p-1.5 bg-stone-900 rounded-lg border border-stone-800/50">
-                  <div className="text-[9px] text-stone-500">QUEUED</div>
-                  <div className="text-xs font-bold text-amber-200">{q.stats.queuedCount}</div>
+            return (
+              <div
+                key={q.id}
+                onClick={() => onNavigateToTab('queues')}
+                className={`p-4 ${theme.bg} ${theme.border} border rounded-xl cursor-pointer transition-all space-y-3 group shadow-sm`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-stone-100 text-xs truncate group-hover:text-cyan-200 transition-colors">{q.name}</span>
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${theme.badge} border`}>
+                    P{q.priority}
+                  </span>
                 </div>
-                <div className="p-1.5 bg-stone-900 rounded-lg border border-stone-800/50">
-                  <div className="text-[9px] text-stone-500">RUNNING</div>
-                  <div className="text-xs font-bold text-sky-300">{q.stats.runningCount}</div>
-                </div>
-                <div className="p-1.5 bg-stone-900 rounded-lg border border-stone-800/50">
-                  <div className="text-[9px] text-stone-500">DONE</div>
-                  <div className="text-xs font-bold text-emerald-300">{q.stats.completedCount}</div>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-between text-[10px] text-stone-400">
-                <span>Limit: {q.rateLimitPerMin} req/m</span>
-                <span>Avg: {q.stats.avgExecutionDurationMs}ms</span>
+                <div className="grid grid-cols-3 gap-1 text-center font-mono">
+                  <div className="p-1.5 bg-stone-900/80 rounded-lg border border-stone-800/50">
+                    <div className="text-[9px] text-stone-400">QUEUED</div>
+                    <div className="text-xs font-bold text-amber-300">{q.stats.queuedCount}</div>
+                  </div>
+                  <div className="p-1.5 bg-stone-900/80 rounded-lg border border-stone-800/50">
+                    <div className="text-[9px] text-stone-400">RUNNING</div>
+                    <div className="text-xs font-bold text-sky-300">{q.stats.runningCount}</div>
+                  </div>
+                  <div className="p-1.5 bg-stone-900/80 rounded-lg border border-stone-800/50">
+                    <div className="text-[9px] text-stone-400">DONE</div>
+                    <div className="text-xs font-bold text-emerald-300">{q.stats.completedCount}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-stone-400">
+                  <span>Limit: {q.rateLimitPerMin} req/m</span>
+                  <span>Avg: {q.stats.avgExecutionDurationMs}ms</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* Bottom Section: Recent Jobs & Real-Time Event Stream */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Recent Executions */}
-        <div className="bg-stone-900/90 border border-stone-800 p-5 rounded-2xl space-y-4 shadow-sm">
+        {/* Recent Executions (Fuchsia / Purple Deck) */}
+        <div className="bg-gradient-to-br from-fuchsia-950/25 via-stone-900/90 to-stone-900/90 border border-fuchsia-500/30 hover:border-fuchsia-500/50 p-5 rounded-2xl space-y-4 shadow-sm shadow-fuchsia-950/20 transition-all">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-stone-100 flex items-center space-x-2.5">
-              <div className="w-6 h-6 rounded-lg bg-fuchsia-400/10 border border-fuchsia-400/20 flex items-center justify-center text-fuchsia-300 shadow-sm shadow-fuchsia-500/5">
+              <div className="w-6 h-6 rounded-lg bg-fuchsia-500/20 border border-fuchsia-400/30 flex items-center justify-center text-fuchsia-300 shadow-sm shadow-fuchsia-500/10">
                 <Clock className="w-3.5 h-3.5" />
               </div>
               <span>Recent Job Executions</span>
             </h3>
             <button
               onClick={() => onNavigateToTab('jobs')}
-              className="text-xs text-sky-300 hover:text-sky-200 font-semibold flex items-center space-x-1 cursor-pointer"
+              className="text-xs text-fuchsia-300 hover:text-fuchsia-200 font-semibold flex items-center space-x-1 cursor-pointer"
             >
               <span>Explore All</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -266,10 +276,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div
                 key={job.id}
                 onClick={() => onSelectJob(job)}
-                className="p-3 bg-stone-950/70 hover:bg-stone-850 border border-stone-800/80 hover:border-sky-400/30 rounded-xl cursor-pointer transition-all flex items-center justify-between text-xs group"
+                className="p-3 bg-stone-950/80 hover:bg-stone-850 border border-stone-800/80 hover:border-fuchsia-400/40 rounded-xl cursor-pointer transition-all flex items-center justify-between text-xs group"
               >
                 <div className="space-y-0.5 truncate pr-2">
-                  <div className="font-semibold text-stone-200 truncate group-hover:text-sky-200 transition-colors">{job.name}</div>
+                  <div className="font-semibold text-stone-200 truncate group-hover:text-fuchsia-200 transition-colors">{job.name}</div>
                   <div className="text-[10px] text-stone-500 font-mono">{job.id} • {job.queueName || 'Queue'}</div>
                 </div>
 
@@ -288,18 +298,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Live Event Stream Snippet */}
-        <div className="bg-stone-900/90 border border-stone-800 p-5 rounded-2xl space-y-4 shadow-sm">
+        {/* Live Event Stream Snippet (Emerald / Teal Deck) */}
+        <div className="bg-gradient-to-br from-emerald-950/25 via-stone-900/90 to-stone-900/90 border border-emerald-500/30 hover:border-emerald-500/50 p-5 rounded-2xl space-y-4 shadow-sm shadow-emerald-950/20 transition-all">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-stone-100 flex items-center space-x-2.5">
-              <div className="w-6 h-6 rounded-lg bg-sky-400/10 border border-sky-400/20 flex items-center justify-center text-sky-300 shadow-sm shadow-sky-500/5">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shadow-sm shadow-emerald-500/10">
                 <Terminal className="w-3.5 h-3.5" />
               </div>
               <span>Real-Time Cluster Event Stream</span>
             </h3>
             <button
               onClick={() => onNavigateToTab('logs')}
-              className="text-xs text-sky-300 hover:text-sky-200 font-semibold flex items-center space-x-1 cursor-pointer"
+              className="text-xs text-emerald-300 hover:text-emerald-200 font-semibold flex items-center space-x-1 cursor-pointer"
             >
               <span>Full Console</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -312,7 +322,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-stone-500 text-[10px] whitespace-nowrap">
                   {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
-                <span className="text-sky-300 font-bold text-[10px]">[{evt.type}]</span>
+                <span className="text-emerald-300 font-bold text-[10px]">[{evt.type}]</span>
                 <span className="text-stone-300 flex-1 truncate">{evt.message}</span>
               </div>
             ))}

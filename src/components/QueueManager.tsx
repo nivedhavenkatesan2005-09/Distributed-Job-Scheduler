@@ -23,6 +23,7 @@ interface QueueManagerProps {
   onUpdateQueue: (queueId: string, updates: Partial<Queue>) => void;
   onCreateQueue: (data: any) => void;
   onSelectQueueForFilter?: (queueId: string) => void;
+  onOpenRateLimits?: () => void;
 }
 
 export const QueueManager: React.FC<QueueManagerProps> = ({
@@ -31,7 +32,8 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
   onPurgeQueue,
   onUpdateQueue,
   onCreateQueue,
-  onSelectQueueForFilter
+  onSelectQueueForFilter,
+  onOpenRateLimits
 }) => {
   const [editingQueue, setEditingQueue] = useState<Queue | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -87,14 +89,26 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
             Configure weighted priority polling, concurrency ceilings, token-bucket rate limiters, and backoff retry rules.
           </p>
         </div>
-        <button
-          id="btn-create-queue"
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Provision Queue</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          {onOpenRateLimits && (
+            <button
+              id="btn-open-rate-limits"
+              onClick={onOpenRateLimits}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+            >
+              <Gauge className="w-4 h-4 text-amber-400" />
+              <span>Rate Limiting (Token Bucket)</span>
+            </button>
+          )}
+          <button
+            id="btn-create-queue"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/20 transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Provision Queue</span>
+          </button>
+        </div>
       </div>
 
       {/* Queues Grid */}
@@ -102,12 +116,49 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
         {queues.map((q) => {
           const concurrencyPct = Math.min(100, Math.round((q.stats.runningCount / q.maxConcurrency) * 100));
 
+          // Color-coded deck styles based on queue priority/tier
+          const isCritical = q.priority >= 8;
+          const isHigh = q.priority >= 5 && q.priority < 8;
+          const isDefault = q.priority >= 3 && q.priority < 5;
+
+          const deckStyle = isCritical
+            ? {
+                border: 'border-rose-500/40 hover:border-rose-400/70',
+                bg: 'bg-gradient-to-br from-rose-950/25 via-slate-900/95 to-slate-900',
+                badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+                accentText: 'text-rose-400',
+                barGradient: 'from-rose-500 to-amber-500'
+              }
+            : isHigh
+            ? {
+                border: 'border-amber-500/40 hover:border-amber-400/70',
+                bg: 'bg-gradient-to-br from-amber-950/25 via-slate-900/95 to-slate-900',
+                badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                accentText: 'text-amber-400',
+                barGradient: 'from-amber-500 to-yellow-400'
+              }
+            : isDefault
+            ? {
+                border: 'border-cyan-500/40 hover:border-cyan-400/70',
+                bg: 'bg-gradient-to-br from-cyan-950/25 via-slate-900/95 to-slate-900',
+                badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+                accentText: 'text-cyan-400',
+                barGradient: 'from-cyan-500 to-sky-400'
+              }
+            : {
+                border: 'border-emerald-500/40 hover:border-emerald-400/70',
+                bg: 'bg-gradient-to-br from-emerald-950/25 via-slate-900/95 to-slate-900',
+                badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                accentText: 'text-emerald-400',
+                barGradient: 'from-emerald-500 to-teal-400'
+              };
+
           return (
             <div
               key={q.id}
               id={`queue-card-${q.id}`}
-              className={`bg-slate-900/90 border rounded-2xl p-5 transition-all shadow-sm relative ${
-                q.isPaused ? 'border-amber-500/40 bg-slate-900/60' : 'border-slate-800 hover:border-slate-700'
+              className={`${deckStyle.bg} border ${deckStyle.border} rounded-2xl p-5 transition-all shadow-sm shadow-black/40 relative ${
+                q.isPaused ? 'border-amber-500/40 opacity-85' : ''
               }`}
             >
               {/* Top Queue Bar */}
@@ -119,7 +170,7 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
                       {q.slug}
                     </span>
                     {q.isPaused && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
                         PAUSED
                       </span>
                     )}
@@ -130,11 +181,7 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
                 {/* Priority Badge */}
                 <div className="flex flex-col items-end">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Priority</span>
-                  <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-md mt-0.5 ${
-                    q.priority >= 8 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
-                    q.priority >= 5 ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' :
-                    'bg-slate-800 text-slate-300 border border-slate-700'
-                  }`}>
+                  <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-md mt-0.5 border ${deckStyle.badge}`}>
                     Weight {q.priority}/10
                   </span>
                 </div>
@@ -146,16 +193,14 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-1">
                     <span className="flex items-center space-x-1">
-                      <Gauge className="w-3.5 h-3.5 text-indigo-400" />
+                      <Gauge className={`w-3.5 h-3.5 ${deckStyle.accentText}`} />
                       <span>Concurrency</span>
                     </span>
                     <span className="font-mono text-slate-200 font-semibold">{q.stats.runningCount} / {q.maxConcurrency} slots</span>
                   </div>
                   <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div
-                      className={`h-full transition-all duration-300 ${
-                        concurrencyPct > 80 ? 'bg-rose-500' : concurrencyPct > 40 ? 'bg-indigo-500' : 'bg-emerald-500'
-                      }`}
+                      className={`h-full bg-gradient-to-r ${deckStyle.barGradient} transition-all duration-300`}
                       style={{ width: `${concurrencyPct}%` }}
                     />
                   </div>
@@ -180,15 +225,15 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
               <div className="grid grid-cols-5 gap-1.5 my-3 text-center">
                 <div className="p-2 bg-slate-800/60 rounded-lg border border-slate-700/40">
                   <div className="text-[10px] text-slate-400 uppercase">Queued</div>
-                  <div className="text-sm font-bold font-mono text-amber-400">{q.stats.queuedCount}</div>
+                  <div className="text-sm font-bold font-mono text-amber-300">{q.stats.queuedCount}</div>
                 </div>
                 <div className="p-2 bg-slate-800/60 rounded-lg border border-slate-700/40">
                   <div className="text-[10px] text-slate-400 uppercase">Running</div>
-                  <div className="text-sm font-bold font-mono text-blue-400">{q.stats.runningCount}</div>
+                  <div className="text-sm font-bold font-mono text-cyan-300">{q.stats.runningCount}</div>
                 </div>
                 <div className="p-2 bg-slate-800/60 rounded-lg border border-slate-700/40">
                   <div className="text-[10px] text-slate-400 uppercase">Done</div>
-                  <div className="text-sm font-bold font-mono text-emerald-400">{q.stats.completedCount}</div>
+                  <div className="text-sm font-bold font-mono text-emerald-300">{q.stats.completedCount}</div>
                 </div>
                 <div className="p-2 bg-slate-800/60 rounded-lg border border-slate-700/40">
                   <div className="text-[10px] text-slate-400 uppercase">Failed</div>
@@ -196,7 +241,7 @@ export const QueueManager: React.FC<QueueManagerProps> = ({
                 </div>
                 <div className="p-2 bg-slate-800/60 rounded-lg border border-slate-700/40">
                   <div className="text-[10px] text-slate-400 uppercase">DLQ</div>
-                  <div className="text-sm font-bold font-mono text-purple-400">{q.stats.dlqCount}</div>
+                  <div className="text-sm font-bold font-mono text-purple-300">{q.stats.dlqCount}</div>
                 </div>
               </div>
 

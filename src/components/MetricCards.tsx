@@ -85,7 +85,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
     setTimeout(() => setDownloadSuccess(false), 2500);
   };
 
-  // Aesthetic glowing badge icons with premium curated color accents
+  // Aesthetic glowing badge icons with premium distinct color accents for each deck
   const cards = [
     {
       id: 'metric-active-workers',
@@ -94,11 +94,11 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       subtext: `${metrics.clusterUtilizationPct}% Cluster Concurrency`,
       icon: Server,
       iconColor: 'text-sky-300',
-      iconGlow: 'bg-sky-400/10 border-sky-400/20 text-sky-200 shadow-sm shadow-sky-500/5',
+      iconGlow: 'bg-sky-500/20 border-sky-400/30 text-sky-200 shadow-md shadow-sky-500/10',
       color: hasWorkerAlert ? 'text-rose-300' : 'text-sky-300',
       bg: hasWorkerAlert
         ? 'bg-rose-950/40 border-rose-400/40 ring-1 ring-rose-400/30 animate-pulse'
-        : 'bg-stone-900/90 hover:border-sky-400/30',
+        : 'bg-gradient-to-br from-sky-950/30 via-stone-900/90 to-stone-900/90 border-sky-500/30 hover:border-sky-400/60 shadow-sky-950/20',
       tab: 'workers',
       alertBadge: hasWorkerAlert ? 'HIGH LOAD' : null
     },
@@ -108,12 +108,12 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       value: metrics.queuedJobs,
       subtext: 'Pending worker claim',
       icon: Layers,
-      iconColor: 'text-amber-200',
-      iconGlow: 'bg-amber-400/10 border-amber-400/20 text-amber-200 shadow-sm shadow-amber-500/5',
-      color: hasQueueAlert ? 'text-rose-300' : 'text-amber-200',
+      iconColor: 'text-amber-300',
+      iconGlow: 'bg-amber-500/20 border-amber-400/30 text-amber-200 shadow-md shadow-amber-500/10',
+      color: hasQueueAlert ? 'text-rose-300' : 'text-amber-300',
       bg: hasQueueAlert
         ? 'bg-amber-950/40 border-amber-400/40 ring-1 ring-amber-400/30 animate-pulse'
-        : 'bg-stone-900/90 hover:border-amber-400/30',
+        : 'bg-gradient-to-br from-amber-950/30 via-stone-900/90 to-stone-900/90 border-amber-500/30 hover:border-amber-400/60 shadow-amber-950/20',
       tab: 'jobs',
       alertBadge: hasQueueAlert ? 'BACKLOG EXCEEDED' : null
     },
@@ -124,9 +124,9 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       subtext: 'Active execution leases',
       icon: PlayCircle,
       iconColor: 'text-indigo-300',
-      iconGlow: 'bg-indigo-400/10 border-indigo-400/20 text-indigo-300 shadow-sm shadow-indigo-500/5',
+      iconGlow: 'bg-indigo-500/20 border-indigo-400/30 text-indigo-200 shadow-md shadow-indigo-500/10',
       color: 'text-indigo-300',
-      bg: 'bg-stone-900/90 hover:border-indigo-400/30',
+      bg: 'bg-gradient-to-br from-indigo-950/30 via-stone-900/90 to-stone-900/90 border-indigo-500/30 hover:border-indigo-400/60 shadow-indigo-950/20',
       tab: 'jobs'
     },
     {
@@ -136,9 +136,9 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       subtext: 'Processed / minute',
       icon: TrendingUp,
       iconColor: 'text-emerald-300',
-      iconGlow: 'bg-emerald-400/10 border-emerald-400/20 text-emerald-300 shadow-sm shadow-emerald-500/5',
+      iconGlow: 'bg-emerald-500/20 border-emerald-400/30 text-emerald-200 shadow-md shadow-emerald-500/10',
       color: 'text-emerald-300',
-      bg: 'bg-stone-900/90 hover:border-emerald-400/30',
+      bg: 'bg-gradient-to-br from-emerald-950/30 via-stone-900/90 to-stone-900/90 border-emerald-500/30 hover:border-emerald-400/60 shadow-emerald-950/20',
       tab: 'dashboard'
     },
     {
@@ -148,9 +148,9 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       subtext: `Avg: ${metrics.avgLatencyMs}ms`,
       icon: Clock,
       iconColor: 'text-fuchsia-300',
-      iconGlow: 'bg-fuchsia-400/10 border-fuchsia-400/20 text-fuchsia-300 shadow-sm shadow-fuchsia-500/5',
+      iconGlow: 'bg-fuchsia-500/20 border-fuchsia-400/30 text-fuchsia-200 shadow-md shadow-fuchsia-500/10',
       color: 'text-fuchsia-300',
-      bg: 'bg-stone-900/90 hover:border-fuchsia-400/30',
+      bg: 'bg-gradient-to-br from-fuchsia-950/30 via-stone-900/90 to-stone-900/90 border-fuchsia-500/30 hover:border-fuchsia-400/60 shadow-fuchsia-950/20',
       tab: 'dashboard'
     },
     {
@@ -161,10 +161,12 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       icon: AlertTriangle,
       iconColor: metrics.dlqJobs > 0 ? 'text-rose-300' : 'text-stone-400',
       iconGlow: metrics.dlqJobs > 0
-        ? 'bg-rose-400/10 border-rose-400/20 text-rose-300 shadow-sm shadow-rose-500/5'
+        ? 'bg-rose-500/20 border-rose-400/30 text-rose-200 shadow-md shadow-rose-500/10'
         : 'bg-stone-800/60 border-stone-700/50 text-stone-400',
       color: metrics.dlqJobs > 0 ? 'text-rose-300' : 'text-stone-400',
-      bg: metrics.dlqJobs > 0 ? 'bg-rose-950/25 border-rose-400/30' : 'bg-stone-900/90 hover:border-stone-700',
+      bg: metrics.dlqJobs > 0
+        ? 'bg-gradient-to-br from-rose-950/40 via-stone-900/90 to-stone-900/90 border-rose-500/40 hover:border-rose-400/70 shadow-rose-950/20'
+        : 'bg-stone-900/90 hover:border-stone-700 border-stone-800',
       tab: 'dlq'
     },
     {
@@ -175,10 +177,12 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       icon: CheckCircle,
       iconColor: hasErrorAlert ? 'text-rose-300' : 'text-teal-300',
       iconGlow: hasErrorAlert
-        ? 'bg-rose-400/10 border-rose-400/20 text-rose-300'
-        : 'bg-teal-400/10 border-teal-400/20 text-teal-300 shadow-sm shadow-teal-500/5',
+        ? 'bg-rose-500/20 border-rose-400/30 text-rose-200'
+        : 'bg-teal-500/20 border-teal-400/30 text-teal-200 shadow-md shadow-teal-500/10',
       color: hasErrorAlert ? 'text-rose-300' : 'text-teal-300',
-      bg: hasErrorAlert ? 'bg-rose-950/30 border-rose-400/40' : 'bg-stone-900/90 hover:border-teal-400/30',
+      bg: hasErrorAlert
+        ? 'bg-rose-950/30 border-rose-400/40'
+        : 'bg-gradient-to-br from-teal-950/30 via-stone-900/90 to-stone-900/90 border-teal-500/30 hover:border-teal-400/60 shadow-teal-950/20',
       tab: 'dashboard'
     }
   ];

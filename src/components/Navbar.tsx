@@ -23,7 +23,8 @@ import {
   Search,
   Filter,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 import { Project, Role, User, ThemeMode } from '../types';
 import { ThemeSelector } from './ThemeSelector';
@@ -41,6 +42,7 @@ interface NavbarProps {
   dlqCount: number;
   activeAlertCount?: number;
   onOpenAlertSettings?: () => void;
+  onOpenCommandPalette?: () => void;
   currentTheme?: ThemeMode;
   onSelectTheme?: (theme: ThemeMode) => void;
   onLogout?: () => void;
@@ -61,6 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   dlqCount,
   activeAlertCount = 0,
   onOpenAlertSettings,
+  onOpenCommandPalette,
   currentTheme = 'light',
   onSelectTheme = () => {},
   onLogout
@@ -80,11 +83,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   const allTabs = [
     // Operations
     { id: 'dashboard', label: 'Dashboard', icon: Activity, category: 'operations' as NavCategory, primary: true },
-    { id: 'queues', label: 'Queues', icon: Layers, category: 'operations' as NavCategory, primary: true },
+    { id: 'queues', label: 'Queues & Rate Limits', icon: Layers, category: 'operations' as NavCategory, primary: true },
     { id: 'jobs', label: 'Job Explorer', icon: Zap, category: 'operations' as NavCategory, primary: true },
     { id: 'dlq', label: 'Dead Letter Queue', icon: AlertOctagon, category: 'operations' as NavCategory, badge: dlqCount, primary: true },
     
-    // Automation
+    // Distributed Engines
+    { id: 'locks', label: 'Distributed Locks', icon: ShieldCheck, category: 'operations' as NavCategory, primary: true },
+    { id: 'shards', label: 'Queue Sharding', icon: Database, category: 'operations' as NavCategory, primary: true },
+
+    // Automation & Events
+    { id: 'events', label: 'Event-Driven Bus', icon: Radio, category: 'automation' as NavCategory, primary: true },
     { id: 'schedules', label: 'Cron Schedules', icon: Timer, category: 'automation' as NavCategory, primary: true },
     { id: 'workflows', label: 'Workflows (DAG)', icon: GitMerge, category: 'automation' as NavCategory, primary: true },
     { id: 'webhooks', label: 'Webhooks', icon: Webhook, category: 'automation' as NavCategory, primary: false },
@@ -200,6 +208,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right Controls Bar */}
           <div className="flex items-center space-x-2">
             
+            {/* Quick Command & Tab Switcher (Cmd+K / Ctrl+K) */}
+            {onOpenCommandPalette && (
+              <button
+                id="btn-quick-command-palette"
+                onClick={onOpenCommandPalette}
+                className="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-md bg-stone-900/80 hover:bg-stone-800 text-stone-300 hover:text-white border border-stone-800 hover:border-stone-700 transition-all text-xs cursor-pointer shadow-sm group"
+                title="Quick Tab Switcher & Command Palette (Ctrl+K or ⌘K)"
+              >
+                <Search className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span className="text-stone-400 group-hover:text-stone-200 font-medium text-[11px]">Quick Switch</span>
+                <kbd className="flex items-center space-x-0.5 px-1 py-0.2 rounded bg-stone-950/90 border border-stone-700 text-[10px] font-mono text-cyan-300">
+                  <span>⌘K</span>
+                </kbd>
+              </button>
+            )}
+
             {/* Live SSE Status */}
             <div className="flex items-center space-x-1.5 px-2 py-1 rounded-md bg-stone-900/80 border border-stone-800 text-xs">
               <span className={`h-1.5 w-1.5 rounded-full ${isSseConnected ? 'bg-emerald-400 animate-pulse ring-2 ring-emerald-400/30' : 'bg-amber-400'}`} />
@@ -313,6 +337,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="bg-transparent text-[11px] font-semibold uppercase text-amber-400 focus:outline-none cursor-pointer"
               >
                 <option value="admin" className="bg-stone-900 text-stone-200">ADMIN</option>
+                <option value="operator" className="bg-stone-900 text-stone-200">OPERATOR</option>
                 <option value="developer" className="bg-stone-900 text-stone-200">DEVELOPER</option>
                 <option value="viewer" className="bg-stone-900 text-stone-200">VIEWER</option>
               </select>

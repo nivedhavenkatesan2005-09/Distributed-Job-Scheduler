@@ -43,6 +43,11 @@ export const AutomatedTestRunner: React.FC = () => {
     setIsRunningAll(false);
   };
 
+  // Automatically execute verification test suite on first mount so results are always ready
+  React.useEffect(() => {
+    runAllTests();
+  }, []);
+
   const totalPassed = Object.values(testResults).filter((r: TestSuiteResult) => r.status === 'PASSED').length;
   const totalFailed = Object.values(testResults).filter((r: TestSuiteResult) => r.status === 'FAILED').length;
 
@@ -60,14 +65,26 @@ export const AutomatedTestRunner: React.FC = () => {
           </p>
         </div>
 
-        {/* Run All Button */}
-        <div className="flex items-center space-x-3">
-          {Object.keys(testResults).length > 0 && (
-            <div className="flex items-center space-x-2 text-xs font-mono">
-              <span className="text-emerald-400 font-bold">{totalPassed} PASSED</span>
-              {totalFailed > 0 && <span className="text-rose-400 font-bold">{totalFailed} FAILED</span>}
-            </div>
-          )}
+        {/* Run All Button & Status Indicator */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 text-xs font-mono">
+            {Object.keys(testResults).length === 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700">
+                0 / {testSuitesList.length} Tests Run
+              </span>
+            ) : (
+              <>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                  {totalPassed} / {testSuitesList.length} PASSED
+                </span>
+                {totalFailed > 0 && (
+                  <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">
+                    {totalFailed} FAILED
+                  </span>
+                )}
+              </>
+            )}
+          </div>
 
           <button
             id="btn-run-all-tests"

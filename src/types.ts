@@ -2,7 +2,21 @@
  * Core type definitions for the Distributed Job Scheduler
  */
 
-export type Role = 'admin' | 'developer' | 'viewer';
+export type Role = 'admin' | 'operator' | 'developer' | 'viewer';
+
+export type Permission = 
+  | 'MANAGE_QUEUES'
+  | 'SCALE_WORKERS'
+  | 'CREATE_JOBS'
+  | 'CANCEL_JOBS'
+  | 'REPLAY_DLQ'
+  | 'PURGE_DLQ'
+  | 'RUN_TESTS'
+  | 'MANAGE_WORKFLOWS'
+  | 'MANAGE_LOCKS'
+  | 'MANAGE_SHARDS'
+  | 'MANAGE_RULES'
+  | 'VIEW_METRICS';
 
 export interface User {
   id: string;
@@ -11,6 +25,7 @@ export interface User {
   role: Role;
   organizationId: string;
   avatarUrl?: string;
+  permissions?: Permission[];
 }
 
 export interface Organization {
@@ -414,4 +429,115 @@ export interface ThemeConfig {
   borderPreview: string;
   isDark: boolean;
 }
+
+// ----------------------------------------------------------------------------
+// Distributed Locking Types
+// ----------------------------------------------------------------------------
+export interface DistributedLock {
+  id: string;
+  key: string;
+  holderWorkerId: string;
+  holderWorkerName: string;
+  fencingToken: number; // Monotonically increasing 64-bit integer
+  acquiredAt: string;
+  expiresAt: string;
+  ttlMs: number;
+  remainingTtlMs?: number;
+  renewCount: number;
+  metadata?: Record<string, any>;
+  status: 'ACQUIRED' | 'RENEWED' | 'EXPIRED' | 'RELEASED';
+}
+
+// ----------------------------------------------------------------------------
+// Queue Sharding & Consistent Hashing Types
+// ----------------------------------------------------------------------------
+export interface ShardNode {
+  id: string;
+  name: string;
+  region: string;
+  vnodesCount: number;
+  status: 'ACTIVE' | 'DRAINING' | 'STANDBY';
+  assignedPartitions: number;
+  totalKeysRouted: number;
+  currentJobsCount: number;
+  memoryMb: number;
+  cpuUsagePct: number;
+  ringAngleStartDeg: number;
+  ringAngleEndDeg: number;
+}
+
+export interface ShardPartitionRoute {
+  partitionKey: string;
+  hashValue: number;
+  assignedShardId: string;
+  assignedShardName: string;
+  vnodeToken: string;
+  replicationShardIds: string[];
+}
+
+// ----------------------------------------------------------------------------
+// Event-Driven Execution & Trigger Rules Types
+// ----------------------------------------------------------------------------
+export interface EventTriggerRule {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  eventPattern: string; // e.g. 'user.signup', 'order.paid', 'payment.*', 'job.failed'
+  actionType: 'SCHEDULE_JOB' | 'TRIGGER_WORKFLOW' | 'DISPATCH_WEBHOOK';
+  targetQueueId?: string;
+  targetJobName?: string;
+  targetWorkflowId?: string;
+  targetWebhookId?: string;
+  payloadTemplate: Record<string, any>;
+  filterConditions?: {
+    field: string;
+    operator: 'equals' | 'contains' | 'greater_than' | 'in';
+    value: any;
+  }[];
+  enabled: boolean;
+  totalTriggeredCount: number;
+  lastTriggeredAt?: string;
+  createdAt: string;
+}
+
+export interface EventBusMessage {
+  id: string;
+  eventName: string;
+  source: string;
+  payload: Record<string, any>;
+  timestamp: string;
+  matchedRulesCount: number;
+  triggeredJobIds: string[];
+  status: 'PROCESSED' | 'NO_MATCH' | 'FAILED';
+}
+
+// ----------------------------------------------------------------------------
+// Rate Limiting & Token Bucket Types
+// ----------------------------------------------------------------------------
+export interface TokenBucketStatus {
+  queueId: string;
+  queueName: string;
+  rateLimitPerMin: number;
+  burstCapacity: number;
+  availableTokens: number;
+  fillPercentage: number;
+  refillRateTokensPerSec: number;
+  lastRefillTimestamp: number;
+  throttledRequestsCount: number;
+  windowResetInSeconds: number;
+}
+
+// ----------------------------------------------------------------------------
+// WebSocket Realtime State Types
+// ----------------------------------------------------------------------------
+export interface RealtimeConnectionState {
+  protocol: 'websocket' | 'sse' | 'disconnected';
+  connected: boolean;
+  latencyMs: number;
+  lastHeartbeatAt: string;
+  subscribedChannels: string[];
+  messagesReceivedCount: number;
+}
+
 

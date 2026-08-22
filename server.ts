@@ -1,16 +1,22 @@
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { router as apiRouter } from './server/routes';
 import { scheduler } from './server/scheduler';
 import { workerPool } from './server/worker-pool';
+import { realtimeHub } from './server/realtime';
 
 dotenv.config();
 
 async function startServer() {
   const app = express();
+  const server = http.createServer(app);
   const PORT = 3000;
+
+  // Initialize WebSocket Server on /ws
+  realtimeHub.initWebSocket(server);
 
   // JSON Body Parser with reasonable limit
   app.use(express.json({ limit: '10mb' }));
@@ -29,7 +35,16 @@ async function startServer() {
 
   // Health check endpoint
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      time: new Date().toISOString(),
+      realtime: realtimeHub.getStats()
+    });
+  });
+
+  // Serve printable submission report HTML
+  app.get('/submission-report', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'docs', 'SUBMISSION_REPORT.html'));
   });
 
   // Start background engines (Scheduler Ticker & Worker Pool)
@@ -51,11 +66,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Distributed Job Scheduler] Server listening on http://0.0.0.0:${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Distributed Job Scheduler] Server listening on http://0.0.0.0:${PORT} (WS on /ws)`);
   });
 }
 
 startServer().catch((err) => {
   console.error('[Server] Fatal bootstrap error:', err);
 });
+
